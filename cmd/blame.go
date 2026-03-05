@@ -22,7 +22,7 @@ func init() {
 }
 
 func runBlame(cmd *cobra.Command, args []string) error {
-	filePath := args[0]
+	filePath := relPath(args[0])
 
 	sourceBytes, err := os.ReadFile(filePath)
 	if err != nil {

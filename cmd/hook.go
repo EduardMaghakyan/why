@@ -49,6 +49,7 @@ func runHookPre(cmd *cobra.Command, args []string) error {
 
 	paths := hook.ExtractPaths(hookInput.ToolInput)
 	for _, filePath := range paths {
+		filePath = relPath(filePath)
 		if shouldSkip(filePath) {
 			continue
 		}
@@ -92,6 +93,7 @@ func runHookPost(cmd *cobra.Command, args []string) error {
 	refs := store.NewRefs(".why")
 
 	for _, filePath := range paths {
+		filePath = relPath(filePath)
 		if shouldSkip(filePath) {
 			continue
 		}
@@ -129,6 +131,24 @@ func runHookPost(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("{}")
 	return nil
+}
+
+// relPath normalizes a path to be relative to cwd.
+// Claude Code often sends absolute paths in tool_input;
+// refs must use relative paths so blame lookups work.
+func relPath(path string) string {
+	if !filepath.IsAbs(path) {
+		return path
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return path
+	}
+	rel, err := filepath.Rel(cwd, path)
+	if err != nil {
+		return path
+	}
+	return rel
 }
 
 func shouldSkip(path string) bool {

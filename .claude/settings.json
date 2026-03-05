@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__why-tracker__record_why"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "why hook pre"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "why hook post"
+          }
+        ]
+      }
+    ]
+  }
+}
