@@ -1,8 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Write(**/*.why)",
-      "Edit(**/*.why)",
       "mcp__why-tracker__record_why"
     ]
   },
@@ -13,7 +11,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/pre-edit.sh"
+            "command": "why hook pre"
           }
         ]
       }
@@ -24,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/post-edit.sh"
+            "command": "why hook post"
           }
         ]
       }

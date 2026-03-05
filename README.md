@@ -1,77 +1,94 @@
-# why-tracking
+# why
 
-Automatically maintains a `.why` shadow file next to every file Claude Code
-edits — a decision journal that captures the *reasoning* behind each change,
-not just the diff.
+A content-addressable decision journal for Claude Code. Captures the *reasoning*
+behind every edit — not just what changed, but why.
 
-Works like `git blame` but for the "why".
+Think `git blame`, but for the "why".
 
 ## Install
 
-Clone or download this repo anywhere on your machine, then run from inside
-any project you want to track:
+```bash
+# From source
+go install github.com/eduardmaghakyan/why@latest
+
+# Or download a binary
+curl -fsSL https://raw.githubusercontent.com/eduardmaghakyan/why/main/install.sh | sh
+```
+
+## Setup
+
+Run inside any project:
 
 ```bash
-cd /your/project
-bash /path/to/why-tracking/setup.sh
+why setup
 ```
 
-## What you get
+This creates:
+- `.mcp.json` — registers the MCP server with Claude Code
+- `.claude/settings.json` — hooks for Edit/Write/MultiEdit
+- `.claude/why-tracking.md` — instructions for Claude
+- `CLAUDE.md` — includes the instruction file
+- `.gitignore` — ignores `.why/`
 
-For every file Claude edits, a companion `.why` file is created alongside it:
-
-```
-src/auth/login.ts
-src/auth/login.ts.why   ← decision journal
-```
-
-Each entry looks like:
+## How it works
 
 ```
-## 2024-01-15 14:32 | a3f9c2b
-
-Token refresh was racing with logout — both read token state simultaneously
-causing a double-refresh crash on slow connections. Added isRefreshing ref
-flag to prevent re-entrant calls. Considered a mutex but it blocks the UI
-thread. Tradeoff: a crashed refresh could leave the flag stuck; added 5s
-timeout to auto-reset.
-
-​```diff
-+ const isRefreshing = useRef(false)
-- if (token.expired) refresh()
-+ if (token.expired && !isRefreshing.current) refresh()
-​```
-
----
+Claude → record_why(file, reasoning) → object stored in .why/objects/
+Claude → Edit(file, ...) →
+  pre-hook: snapshots file + reads reasoning hash
+  [edit happens]
+  post-hook: diffs old vs new → updates .why/refs/<file> line-by-line
 ```
 
-## Useful commands
+Every reasoning entry is stored as an immutable, content-addressed object.
+A refs file maps each source line to its reasoning — like git blame, but for decisions.
+
+## Storage
+
+```
+.why/
+  objects/<2char>/<hash>   # immutable reasoning: {"ts", "commit", "reasoning"}
+  refs/<source-path>       # one hash per line, aligned with source
+```
+
+## Commands
 
 ```bash
-# Full decision history for one file
-git log -p src/auth/login.ts.why
+# Line-by-line reasoning (like git blame)
+why blame src/auth/login.ts
 
-# Search reasoning across the whole project
-grep -r "race condition" **/*.why
+# Edit history for a file
+why history src/auth/login.ts
 
-# All reasoning added in the last commit
-git diff HEAD~1 -- '*.why'
+# Install into a project
+why setup
 
-# Pair with git blame — grab a hash, look it up
-git blame src/auth/login.ts   # → find hash a3f9c2b
-grep -A 20 "a3f9c2b" src/auth/login.ts.why
+# Remove from a project
+why uninstall
 ```
 
-## Uninstall
+### Example blame output
+
+```
+   1                                                             import { useRef } from 'react'
+   2  a3f9c2b  Token refresh racing with logout — added guard    const isRefreshing = useRef(false)
+   3  a3f9c2b  Token refresh racing with logout — added guard    if (!isRefreshing.current) refresh()
+```
+
+## Search reasoning
 
 ```bash
-cd /your/project
-bash /path/to/why-tracking/uninstall.sh
+grep -r "race condition" .why/objects/
 ```
 
 ## Requirements
 
 - Claude Code
-- `jq` (`brew install jq` or `apt install jq`)
-- `uv` (auto-installed by setup.sh, or `curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- `git` (optional but recommended for diffs)
+- `git` (optional, for commit hashes in reasoning entries)
+
+## Uninstall
+
+```bash
+why uninstall
+rm -rf .why/  # optional: delete reasoning data
+```
