@@ -5,30 +5,41 @@ behind every edit — not just what changed, but why.
 
 Think `git blame`, but for the "why".
 
-## Install
+## Getting Started
+
+### 1. Install the CLI
 
 ```bash
-# From source
+# From source (requires Go)
 go install github.com/eduardmaghakyan/why@latest
 
 # Or download a binary
 curl -fsSL https://raw.githubusercontent.com/eduardmaghakyan/why/main/install.sh | sh
 ```
 
-## Setup
-
-Run inside any project:
+### 2. Configure Claude Code
 
 ```bash
 why setup
 ```
 
-This creates:
-- `.mcp.json` — registers the MCP server with Claude Code
-- `.claude/settings.json` — hooks for Edit/Write/MultiEdit
-- `.claude/why-tracking.md` — instructions for Claude
-- `CLAUDE.md` — includes the instruction file
-- `.gitignore` — ignores `.why/`
+This installs **globally** so why-tracking works in every project:
+- `~/.claude.json` — registers the MCP server with Claude Code
+- `~/.claude/settings.json` — hooks for Edit/Write/MultiEdit
+- `~/.claude/CLAUDE.md` — instructions for Claude
+
+The `.why/` data directory and `.gitignore` entry are created per-project automatically.
+
+### Per-project only
+
+To scope everything to a single project instead of installing globally:
+
+```bash
+why setup --project
+```
+
+This creates `.mcp.json`, `.claude/settings.json`, `.claude/why-tracking.md`,
+and patches `CLAUDE.md` — all within the current project directory.
 
 ## How it works
 
@@ -60,11 +71,17 @@ why blame src/auth/login.ts
 # Edit history for a file
 why history src/auth/login.ts
 
-# Install into a project
+# Install globally (default)
 why setup
 
-# Remove from a project
+# Install per-project only
+why setup --project
+
+# Remove global config
 why uninstall
+
+# Remove per-project config
+why uninstall --project
 ```
 
 ### Example blame output
@@ -89,6 +106,12 @@ grep -r "race condition" .why/objects/
 ## Uninstall
 
 ```bash
+# Remove global config (default)
 why uninstall
-rm -rf .why/  # optional: delete reasoning data
+
+# Remove per-project config
+why uninstall --project
+
+# Optional: delete reasoning data
+rm -rf .why/
 ```
