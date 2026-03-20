@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var historyRelated bool
+
 var historyCmd = &cobra.Command{
 	Use:   "history <file>",
 	Short: "Show edit history with reasoning for a file",
@@ -16,6 +18,7 @@ var historyCmd = &cobra.Command{
 }
 
 func init() {
+	historyCmd.Flags().BoolVar(&historyRelated, "related", false, "Show files changed together (by shared reasoning hash)")
 	rootCmd.AddCommand(historyCmd)
 }
 
@@ -54,7 +57,28 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	})
 
 	for _, e := range entries {
-		fmt.Printf("## %s | %s\n\n%s\n\n---\n\n", e.obj.Timestamp, e.obj.Commit, e.obj.Reasoning)
+		fmt.Printf("## %s | %s\n\n%s\n", e.obj.Timestamp, e.obj.Commit, e.obj.Reasoning)
+
+		if historyRelated {
+			related := refs.FindByHash(e.hash)
+			delete(related, filePath)
+
+			if len(related) > 0 {
+				// Sort keys for stable output
+				keys := make([]string, 0, len(related))
+				for k := range related {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+
+				fmt.Printf("\n  Related files:\n")
+				for _, k := range keys {
+					fmt.Printf("    %s (%d lines)\n", k, related[k])
+				}
+			}
+		}
+
+		fmt.Printf("\n---\n\n")
 	}
 
 	return nil

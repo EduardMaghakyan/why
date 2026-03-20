@@ -77,6 +77,44 @@ func (r *Refs) Rebuild(oldLines, newLines, oldHashes []string, reasoningHash str
 	return newHashes
 }
 
+// FindByHash walks all refs files and returns a map of filePath→lineCount
+// for every file that contains at least one line matching the given hash.
+func (r *Refs) FindByHash(hash string) map[string]int {
+	refsDir := filepath.Join(r.Root, "refs")
+	result := make(map[string]int)
+
+	filepath.Walk(refsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		content := string(data)
+		if !strings.Contains(content, hash) {
+			return nil
+		}
+		lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+		count := 0
+		for _, line := range lines {
+			if line == hash {
+				count++
+			}
+		}
+		if count > 0 {
+			rel, err := filepath.Rel(refsDir, path)
+			if err != nil {
+				return nil
+			}
+			result[rel] = count
+		}
+		return nil
+	})
+
+	return result
+}
+
 func (r *Refs) refPath(sourcePath string) string {
 	return filepath.Join(r.Root, "refs", sourcePath)
 }
