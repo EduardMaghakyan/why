@@ -15,6 +15,11 @@ go install github.com/eduardmaghakyan/why@latest
 
 # Or download a binary
 curl -fsSL https://raw.githubusercontent.com/eduardmaghakyan/why/main/install.sh | sh
+
+# Or build from source
+git clone https://github.com/eduardmaghakyan/why.git
+cd why
+make install
 ```
 
 ### 2. Configure Claude Code
