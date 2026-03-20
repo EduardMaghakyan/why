@@ -11,38 +11,43 @@ type HookInput struct {
 // ExtractPaths extracts file path(s) from various tool_input shapes.
 // Handles Edit (file_path), Write (file_path), MultiEdit (edits[].file_path).
 func ExtractPaths(raw json.RawMessage) []string {
-	// Try "file_path" (Edit, Write)
-	var single struct {
-		FilePath string `json:"file_path"`
-	}
-	if json.Unmarshal(raw, &single) == nil && single.FilePath != "" {
-		return []string{single.FilePath}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return nil
 	}
 
-	// Try "edits" array (MultiEdit)
-	var multi struct {
-		Edits []struct {
-			FilePath string `json:"file_path"`
-		} `json:"edits"`
-	}
-	if json.Unmarshal(raw, &multi) == nil && len(multi.Edits) > 0 {
-		seen := map[string]bool{}
-		var paths []string
-		for _, e := range multi.Edits {
-			if e.FilePath != "" && !seen[e.FilePath] {
-				paths = append(paths, e.FilePath)
-				seen[e.FilePath] = true
-			}
+	// "file_path" → Edit, Write
+	if fp, ok := fields["file_path"]; ok {
+		var s string
+		if json.Unmarshal(fp, &s) == nil && s != "" {
+			return []string{s}
 		}
-		return paths
 	}
 
-	// Fallback: try "path" for forward compatibility
-	var fallback struct {
-		Path string `json:"path"`
+	// "edits" → MultiEdit
+	if editsRaw, ok := fields["edits"]; ok {
+		var edits []struct {
+			FilePath string `json:"file_path"`
+		}
+		if json.Unmarshal(editsRaw, &edits) == nil && len(edits) > 0 {
+			seen := map[string]bool{}
+			var paths []string
+			for _, e := range edits {
+				if e.FilePath != "" && !seen[e.FilePath] {
+					paths = append(paths, e.FilePath)
+					seen[e.FilePath] = true
+				}
+			}
+			return paths
+		}
 	}
-	if json.Unmarshal(raw, &fallback) == nil && fallback.Path != "" {
-		return []string{fallback.Path}
+
+	// "path" → fallback
+	if p, ok := fields["path"]; ok {
+		var s string
+		if json.Unmarshal(p, &s) == nil && s != "" {
+			return []string{s}
+		}
 	}
 
 	return nil

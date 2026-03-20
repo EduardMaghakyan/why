@@ -34,6 +34,7 @@ func runBlame(cmd *cobra.Command, args []string) error {
 	refs := store.NewRefs(".why")
 	hashes, _ := refs.Read(filePath)
 
+	cache := map[string]*store.Object{}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	for i, line := range sourceLines {
 		hash := ""
@@ -46,10 +47,15 @@ func runBlame(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		obj, err := whyStore.Get(hash)
-		if err != nil {
-			fmt.Fprintf(w, "%4d\t%s\t(missing)\t%s\n", i+1, hash[:8], line)
-			continue
+		obj, ok := cache[hash]
+		if !ok {
+			var err error
+			obj, err = whyStore.Get(hash)
+			if err != nil {
+				fmt.Fprintf(w, "%4d\t%s\t(missing)\t%s\n", i+1, hash[:8], line)
+				continue
+			}
+			cache[hash] = obj
 		}
 
 		summary := truncate(obj.Reasoning, 60)
