@@ -104,7 +104,11 @@ func writeTemplate(projectDir, destRel, templatePath string) error {
 				fmt.Printf("  %s already configured\n", destRel)
 				return nil
 			}
-			fmt.Printf("  WARNING: %s exists. Add why-tracker server manually.\n", destRel)
+			if err := mergeMCPConfig(dest, templatePath); err != nil {
+				fmt.Printf("  WARNING: %s exists. Merge manually: %v\n", destRel, err)
+				return nil
+			}
+			fmt.Printf("  Merged into %s\n", destRel)
 			return nil
 		}
 		fmt.Printf("  %s already exists, skipping\n", destRel)
@@ -177,11 +181,74 @@ func mergeSettings(destPath, templatePath string) error {
 			if _, exists := destHooks[key]; !exists {
 				destHooks[key] = val
 			} else {
-				// Append hook entries
+				// Append hook entries, skipping duplicates
 				srcArr, _ := val.([]interface{})
 				destArr, _ := destHooks[key].([]interface{})
-				destHooks[key] = append(destArr, srcArr...)
+				for _, srcEntry := range srcArr {
+					if !hookEntryExists(destArr, srcEntry) {
+						destArr = append(destArr, srcEntry)
+					}
+				}
+				destHooks[key] = destArr
 			}
+		}
+	}
+
+	out, err := json.MarshalIndent(dest, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(destPath, append(out, '\n'), 0644)
+}
+
+// hookEntryExists checks if a hook entry with the same matcher and command already exists.
+func hookEntryExists(arr []interface{}, entry interface{}) bool {
+	entryMap, ok := entry.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	entryMatcher, _ := entryMap["matcher"].(string)
+	for _, existing := range arr {
+		existingMap, ok := existing.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if existingMatcher, _ := existingMap["matcher"].(string); existingMatcher == entryMatcher {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeMCPConfig merges the why-tracker server into an existing .mcp.json.
+func mergeMCPConfig(destPath, templatePath string) error {
+	existing, err := os.ReadFile(destPath)
+	if err != nil {
+		return err
+	}
+	templateData, err := config.Templates.ReadFile(templatePath)
+	if err != nil {
+		return err
+	}
+
+	var dest, src map[string]interface{}
+	if err := json.Unmarshal(existing, &dest); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(templateData, &src); err != nil {
+		return err
+	}
+
+	// Merge mcpServers
+	srcServers, _ := src["mcpServers"].(map[string]interface{})
+	destServers, _ := dest["mcpServers"].(map[string]interface{})
+	if destServers == nil {
+		destServers = map[string]interface{}{}
+		dest["mcpServers"] = destServers
+	}
+	for name, serverCfg := range srcServers {
+		if _, exists := destServers[name]; !exists {
+			destServers[name] = serverCfg
 		}
 	}
 

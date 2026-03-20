@@ -48,30 +48,48 @@ func runHookPre(cmd *cobra.Command, args []string) error {
 	}
 
 	paths := hook.ExtractPaths(hookInput.ToolInput)
+
+	// First pass: collect pending hashes for all files, find shared hash for MultiEdit
+	type fileInfo struct {
+		relPath string
+		absPath string
+		key     string
+	}
+	var files []fileInfo
+	var sharedHash string
+
 	for _, filePath := range paths {
 		filePath = relPath(filePath)
 		if shouldSkip(filePath) {
 			continue
 		}
-
 		absPath, err := filepath.Abs(filePath)
 		if err != nil {
 			continue
 		}
 		key := hook.FileKey(absPath)
+		files = append(files, fileInfo{relPath: filePath, absPath: absPath, key: key})
 
-		// Read pending reasoning hash
-		reasoningHash := hook.ReadPending(key)
+		// Read pending reasoning hash (consumed on read)
+		if h := hook.ReadPending(key); h != "" && sharedHash == "" {
+			sharedHash = h
+		}
+	}
 
-		// Snapshot current file content
-		content, _ := os.ReadFile(filePath)
+	// Second pass: save pre-state using the shared hash for all files
+	for _, f := range files {
+		reasoningHash := sharedHash
+		if reasoningHash == "" {
+			fmt.Fprintf(os.Stderr, "warning: no reasoning recorded for %s (was record_why called?)\n", f.relPath)
+		}
 
+		content, _ := os.ReadFile(f.relPath)
 		state := &hook.PreState{
-			FilePath:      filePath,
+			FilePath:      f.relPath,
 			ReasoningHash: reasoningHash,
 			Snapshot:      string(content),
 		}
-		state.Save(key)
+		state.Save(f.key)
 	}
 
 	fmt.Println("{}")
@@ -165,5 +183,5 @@ func splitLines(s string) []string {
 	if s == "" {
 		return nil
 	}
-	return strings.Split(s, "\n")
+	return strings.Split(strings.TrimSuffix(s, "\n"), "\n")
 }

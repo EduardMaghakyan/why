@@ -28,7 +28,7 @@ func runBlame(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read source: %w", err)
 	}
-	sourceLines := strings.Split(string(sourceBytes), "\n")
+	sourceLines := strings.Split(strings.TrimSuffix(string(sourceBytes), "\n"), "\n")
 
 	whyStore := store.New(".why")
 	refs := store.NewRefs(".why")

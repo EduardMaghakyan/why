@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/eduardmaghakyan/why/internal/hook"
 	"github.com/spf13/cobra"
 )
 
@@ -64,8 +65,9 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Clean temp files
-	os.RemoveAll("/tmp/.why-pending")
-	os.RemoveAll("/tmp/.why-hook-state")
+	pendingDir, hookStateDir := hook.TempDirs()
+	os.RemoveAll(pendingDir)
+	os.RemoveAll(hookStateDir)
 	fmt.Println("  Cleaned temp files")
 
 	fmt.Println("\nDone. The .why/ directory is preserved.")

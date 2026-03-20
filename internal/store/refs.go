@@ -52,9 +52,20 @@ func (r *Refs) Write(sourcePath string, hashes []string) error {
 	return os.Rename(tmp, path)
 }
 
+const maxDiffLines = 10000
+
 // Rebuild takes old/new source lines, old hashes, and a reasoning hash.
 // Returns new hashes aligned with new source lines.
 func (r *Refs) Rebuild(oldLines, newLines, oldHashes []string, reasoningHash string) []string {
+	// Safety: skip LCS diff for very large files to avoid O(n*m) memory usage
+	if len(oldLines) > maxDiffLines || len(newLines) > maxDiffLines {
+		newHashes := make([]string, len(newLines))
+		for i := range newHashes {
+			newHashes[i] = reasoningHash
+		}
+		return newHashes
+	}
+
 	// Pad oldHashes to match oldLines length
 	for len(oldHashes) < len(oldLines) {
 		oldHashes = append(oldHashes, "")

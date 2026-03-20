@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 )
 
-const (
-	pendingDir  = "/tmp/.why-pending"
-	hookStateDir = "/tmp/.why-hook-state"
+var (
+	pendingDir   = filepath.Join(os.TempDir(), ".why-pending")
+	hookStateDir = filepath.Join(os.TempDir(), ".why-hook-state")
 )
 
 // PreState holds the state saved between pre and post hooks.
@@ -55,6 +55,11 @@ func (s *PreState) Save(key string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(hookStateDir, key), data, 0644)
+}
+
+// TempDirs returns the pending and hook-state temp directory paths.
+func TempDirs() (string, string) {
+	return pendingDir, hookStateDir
 }
 
 // LoadState loads and deletes pre-hook state.
