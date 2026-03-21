@@ -48,15 +48,7 @@ func runHookPre(cmd *cobra.Command, args []string) error {
 	}
 
 	paths := hook.ExtractPaths(hookInput.ToolInput)
-
-	// First pass: collect pending hashes for all files, find shared hash for MultiEdit
-	type fileInfo struct {
-		relPath string
-		absPath string
-		key     string
-	}
-	var files []fileInfo
-	var sharedHash string
+	sharedHash := hook.ReadPending()
 
 	for _, filePath := range paths {
 		filePath = relPath(filePath)
@@ -68,28 +60,18 @@ func runHookPre(cmd *cobra.Command, args []string) error {
 			continue
 		}
 		key := hook.FileKey(absPath)
-		files = append(files, fileInfo{relPath: filePath, absPath: absPath, key: key})
 
-		// Read pending reasoning hash (consumed on read)
-		if h := hook.ReadPending(key); h != "" && sharedHash == "" {
-			sharedHash = h
-		}
-	}
-
-	// Second pass: save pre-state using the shared hash for all files
-	for _, f := range files {
-		reasoningHash := sharedHash
-		if reasoningHash == "" {
-			fmt.Fprintf(os.Stderr, "warning: no reasoning recorded for %s (was record_why called?)\n", f.relPath)
+		if sharedHash == "" {
+			fmt.Fprintf(os.Stderr, "warning: no reasoning recorded for %s (was record_why called?)\n", filePath)
 		}
 
-		content, _ := os.ReadFile(f.relPath)
+		content, _ := os.ReadFile(filePath)
 		state := &hook.PreState{
-			FilePath:      f.relPath,
-			ReasoningHash: reasoningHash,
+			FilePath:      filePath,
+			ReasoningHash: sharedHash,
 			Snapshot:      string(content),
 		}
-		state.Save(f.key)
+		state.Save(key)
 	}
 
 	fmt.Println("{}")

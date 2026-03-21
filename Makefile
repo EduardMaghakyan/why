@@ -7,7 +7,10 @@ test:
 	go test ./...
 
 install: build
-	cp why /usr/local/bin/why
+	mkdir -p $(HOME)/.why/bin
+	cp why $(HOME)/.why/bin/why
+	@echo "Installed to $(HOME)/.why/bin/why"
+	@echo 'Add to PATH: export PATH="$$HOME/.why/bin:$$PATH"'
 
 clean:
 	rm -f why

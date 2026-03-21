@@ -26,23 +26,21 @@ func FileKey(absPath string) string {
 	return hex.EncodeToString(h[:])[:16]
 }
 
-// ReadPending reads and deletes the pending reasoning hash for a file.
-func ReadPending(key string) string {
-	path := filepath.Join(pendingDir, key)
-	data, err := os.ReadFile(path)
+// ReadPending reads the latest pending reasoning hash (non-destructive).
+func ReadPending() string {
+	data, err := os.ReadFile(filepath.Join(pendingDir, "latest"))
 	if err != nil {
 		return ""
 	}
-	os.Remove(path)
 	return string(data)
 }
 
-// WritePending writes a reasoning hash to the pending directory.
-func WritePending(key, hash string) error {
+// WritePending writes a reasoning hash as the latest pending.
+func WritePending(hash string) error {
 	if err := os.MkdirAll(pendingDir, 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(pendingDir, key), []byte(hash), 0644)
+	return os.WriteFile(filepath.Join(pendingDir, "latest"), []byte(hash), 0644)
 }
 
 // SaveState saves pre-hook state for the post-hook to consume.

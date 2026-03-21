@@ -185,9 +185,7 @@ func (s *Server) handleRecordWhy(arguments json.RawMessage) (*ToolCallResult, er
 		return nil, fmt.Errorf("store object: %w", err)
 	}
 
-	absPath, _ := filepath.Abs(args.FilePath)
-	key := hook.FileKey(absPath)
-	if err := hook.WritePending(key, hash); err != nil {
+	if err := hook.WritePending(hash); err != nil {
 		return nil, fmt.Errorf("write pending: %w", err)
 	}
 

@@ -30,8 +30,8 @@ why setup
 
 This installs **globally** so why-tracking works in every project:
 - `~/.claude.json` — registers the MCP server with Claude Code
-- `~/.claude/settings.json` — hooks for Edit/Write/MultiEdit
-- `~/.claude/CLAUDE.md` — instructions for Claude
+- `~/.claude/settings.json` — hooks for Edit/Write/MultiEdit + auto-allows all why-tracker tools
+- `~/.claude/why-tracking.md` — instructions for Claude (included via `@.claude/why-tracking.md` in CLAUDE.md)
 
 The `.why/` data directory and `.gitignore` entry are created per-project automatically.
 
@@ -59,6 +59,19 @@ Claude → Edit(file, ...) →
 Every reasoning entry is stored as an immutable, content-addressed object.
 A refs file maps each source line to its reasoning — like git blame, but for decisions.
 
+### MCP tools
+
+The why-tracker MCP server exposes three tools to Claude:
+
+| Tool | Purpose |
+|------|---------|
+| `record_why` | Record reasoning before an edit (called automatically before Edit/Write/MultiEdit) |
+| `why_blame` | Show line-by-line reasoning for a file |
+| `why_history` | Show edit history with full reasoning for a file (optionally with related files) |
+
+When you ask Claude "why did we change this file?", it uses `why_history` and
+`why_blame` to answer with the actual reasoning — not just commit messages.
+
 ## Storage
 
 ```
@@ -75,6 +88,12 @@ why blame src/auth/login.ts
 
 # Edit history for a file
 why history src/auth/login.ts
+
+# Edit history with related files changed together
+why history --related src/auth/login.ts
+
+# Ask a question about reasoning using Claude
+why query "why did we add the refresh guard?"
 
 # Install globally (default)
 why setup
@@ -97,10 +116,14 @@ why uninstall --project
    3  a3f9c2b  Token refresh racing with logout — added guard    if (!isRefreshing.current) refresh()
 ```
 
-## Search reasoning
+### Example query
 
 ```bash
-grep -r "race condition" .why/objects/
+$ why query "what race conditions have we fixed?"
+Based on the reasoning journal, there was a token refresh race condition
+where refresh() and logout() both read token state simultaneously, causing
+a double-refresh crash on slow connections. An isRefreshing ref flag was
+added to prevent re-entrant calls, with a 5s timeout to auto-reset.
 ```
 
 ## Requirements
