@@ -20,6 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/eduardmaghakyan/why/main/install.sh
 git clone https://github.com/eduardmaghakyan/why.git
 cd why
 make install
+# Then add to PATH: export PATH="$HOME/.why/bin:$PATH"
 ```
 
 ### 2. Configure Claude Code
@@ -111,9 +112,12 @@ why uninstall --project
 ### Example blame output
 
 ```
-   1                                                             import { useRef } from 'react'
-   2  a3f9c2b  Token refresh racing with logout — added guard    const isRefreshing = useRef(false)
-   3  a3f9c2b  Token refresh racing with logout — added guard    if (!isRefreshing.current) refresh()
+src/auth/login.ts
+
+── a3f9c2b: Token refresh racing with logout — added isRefreshing guard ──
+   1 │ import { useRef } from 'react'
+   2 │ const isRefreshing = useRef(false)
+   3 │ if (!isRefreshing.current) refresh()
 ```
 
 ### Example query
