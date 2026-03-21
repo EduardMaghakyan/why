@@ -70,7 +70,10 @@ func ExtractLastReasoning(transcriptPath string) string {
 // parseWhyRecordCmd extracts the reasoning argument from a "why record <file> '<reasoning>'" command.
 func parseWhyRecordCmd(cmd string) string {
 	// Strip "why record "
-	rest := strings.TrimPrefix(cmd, "why record ")
+	if !strings.HasPrefix(cmd, "why record ") {
+		return ""
+	}
+	rest := cmd[len("why record "):]
 
 	// Skip the file argument (first non-quoted token)
 	rest = strings.TrimSpace(rest)

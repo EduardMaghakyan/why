@@ -151,6 +151,9 @@ func writeTemplate(projectDir, destRel, templatePath string) error {
 	if err != nil {
 		return fmt.Errorf("read template %s: %w", templatePath, err)
 	}
+	if destRel == ".claude/settings.json" {
+		data = resolveHookPaths(data)
+	}
 	os.MkdirAll(filepath.Dir(dest), 0755)
 	if err := os.WriteFile(dest, data, 0644); err != nil {
 		return fmt.Errorf("write %s: %w", destRel, err)
@@ -168,6 +171,7 @@ func mergeSettings(destPath, templatePath string) error {
 	if err != nil {
 		return err
 	}
+	templateData = resolveHookPaths(templateData)
 
 	var dest, src map[string]interface{}
 	if err := json.Unmarshal(existing, &dest); err != nil {
@@ -230,6 +234,8 @@ func mergeSettings(destPath, templatePath string) error {
 	if err != nil {
 		return err
 	}
+	// Resolve any "why hook" references to absolute path
+	out = resolveHookPaths(out)
 	return os.WriteFile(destPath, append(out, '\n'), 0644)
 }
 
@@ -311,6 +317,7 @@ func writeSettingsGlobal() error {
 	if err != nil {
 		return fmt.Errorf("read settings template: %w", err)
 	}
+	data = resolveHookPaths(data)
 	os.MkdirAll(filepath.Dir(destPath), 0755)
 	if err := os.WriteFile(destPath, data, 0644); err != nil {
 		return fmt.Errorf("write ~/.claude/settings.json: %w", err)
@@ -414,6 +421,26 @@ func writeInstructionsGlobal() error {
 		fmt.Println("  ~/.claude/CLAUDE.md already configured")
 	}
 	return nil
+}
+
+// whyBinaryPath returns the absolute path to the currently running why binary.
+func whyBinaryPath() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "why" // fallback to PATH lookup
+	}
+	// Resolve symlinks
+	resolved, err := filepath.EvalSymlinks(exe)
+	if err != nil {
+		return exe
+	}
+	return resolved
+}
+
+// resolveHookPaths replaces "why hook" with the absolute binary path in hook commands.
+func resolveHookPaths(data []byte) []byte {
+	binPath := whyBinaryPath()
+	return []byte(strings.ReplaceAll(string(data), "\"why hook", "\""+binPath+" hook"))
 }
 
 func addLineToFile(path, line, msg string) {
