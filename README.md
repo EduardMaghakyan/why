@@ -57,34 +57,52 @@ go install github.com/eduardmaghakyan/why@latest
 # Or build from source
 git clone https://github.com/eduardmaghakyan/why.git && cd why
 make install
-# Add to PATH: export PATH="$HOME/.why/bin:$PATH"
+# Add to PATH for CLI usage: export PATH="$HOME/.why/bin:$PATH"
 
 # Configure Claude Code (one command)
 why setup
 ```
 
-That's it. Claude Code will now record reasoning before every edit automatically.
+That's it. `why setup` installs hooks that automatically track every edit.
+Hooks use absolute paths, so no PATH configuration is needed for them to work.
 
 Use `why setup --project` to scope to a single project instead of installing globally.
 
 ## Commands
 
 ```bash
+why record <file> '<reasoning>'   # Record reasoning before an edit
 why blame <file>                  # Line-by-line reasoning
 why history <file>                # Full edit history with reasoning
 why history --related <file>      # + files changed together
 why query "<question>"            # Ask anything about past decisions
 why setup                         # Install globally
 why setup --project               # Install per-project
+why setup --mcp                   # Install with MCP server (optional)
 why uninstall                     # Remove global config
 why uninstall --project           # Remove per-project config
 ```
 
 ## How it works
 
-`why` runs as an MCP server inside Claude Code. Before every edit, Claude calls
-`record_why` with the reasoning. Pre/post hooks on Edit/Write/MultiEdit snapshot
-the file, diff it, and map each changed line to its reasoning.
+Before every edit, Claude runs `why record` to capture the reasoning. Hooks on
+Edit/Write/MultiEdit automatically snapshot the file, diff it after the edit,
+and map each changed line to its reasoning hash.
+
+```
+Claude runs: why record src/main.go 'Fix race condition in token refresh'
+Claude runs: Edit(src/main.go, ...)
+  → pre-hook: snapshots file, reads reasoning hash
+  → [edit happens]
+  → post-hook: diffs old vs new, updates .why/refs/src/main.go
+```
+
+Turn-based grouping tracks which edits belong together: a `UserPromptSubmit` hook
+marks the start of each turn, and all edits within that turn share a turn ID.
+This powers `--related` — finding files that were changed together.
+
+If `why record` wasn't called (e.g., Claude skipped it), a transcript fallback
+reads the reasoning from the conversation history automatically.
 
 ```
 .why/
@@ -92,9 +110,16 @@ the file, diff it, and map each changed line to its reasoning.
   refs/<file>       # one hash per source line, like git blame
 ```
 
-Claude can also query this data directly — when you ask "why did we change this?",
-it uses `why_blame` and `why_history` MCP tools to answer with actual reasoning
-instead of just commit messages.
+### MCP mode (optional)
+
+For a structured tool interface instead of Bash commands:
+
+```bash
+why setup --mcp
+```
+
+This registers an MCP server that exposes `record_why`, `why_blame`, and
+`why_history` as tools Claude can call directly.
 
 ## Requirements
 
