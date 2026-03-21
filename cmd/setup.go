@@ -11,7 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var setupProject bool
+var (
+	setupProject bool
+	setupMCP     bool
+)
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
@@ -21,7 +24,9 @@ var setupCmd = &cobra.Command{
 
 func init() {
 	setupCmd.Flags().BoolVar(&setupProject, "project", false,
-		"Install per-project only (.claude/settings.json + .mcp.json) instead of globally")
+		"Install per-project only (.claude/settings.json) instead of globally")
+	setupCmd.Flags().BoolVar(&setupMCP, "mcp", false,
+		"Also register MCP server (optional, for structured tool interface)")
 	rootCmd.AddCommand(setupCmd)
 }
 
@@ -43,9 +48,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		// 3. Write .mcp.json
-		if err := writeTemplate(projectDir, ".mcp.json", "templates/mcp.json"); err != nil {
-			return err
+		// 3. Write .mcp.json (only with --mcp)
+		if setupMCP {
+			if err := writeTemplate(projectDir, ".mcp.json", "templates/mcp.json"); err != nil {
+				return err
+			}
 		}
 
 		// 4. Write .claude/why-tracking.md
@@ -75,9 +82,11 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		// 2. MCP config → ~/.claude.json
-		if err := writeMCPGlobal(); err != nil {
-			return err
+		// 2. MCP config → ~/.claude.json (only with --mcp)
+		if setupMCP {
+			if err := writeMCPGlobal(); err != nil {
+				return err
+			}
 		}
 
 		// 3. Instructions → ~/.claude/CLAUDE.md
@@ -290,11 +299,6 @@ func writeSettingsGlobal() error {
 	destPath := filepath.Join(homeDir, ".claude", "settings.json")
 
 	if _, err := os.Stat(destPath); err == nil {
-		existing, _ := os.ReadFile(destPath)
-		if strings.Contains(string(existing), "why hook pre") {
-			fmt.Println("  ~/.claude/settings.json already configured")
-			return nil
-		}
 		if err := mergeSettings(destPath, "templates/settings.json"); err != nil {
 			fmt.Printf("  WARNING: ~/.claude/settings.json exists. Merge manually: %v\n", err)
 			return nil
