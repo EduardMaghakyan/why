@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/eduardmaghakyan/why/internal/store"
 	"github.com/spf13/cobra"
@@ -34,34 +33,38 @@ func runBlame(cmd *cobra.Command, args []string) error {
 	refs := store.NewRefs(".why")
 	hashes, _ := refs.Read(filePath)
 
+	fmt.Println(filePath)
+	fmt.Println()
+
 	cache := map[string]*store.Object{}
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	prevHash := ""
+
 	for i, line := range sourceLines {
 		hash := ""
 		if i < len(hashes) {
 			hash = hashes[i]
 		}
 
-		if hash == "" {
-			fmt.Fprintf(w, "%4d\t\t\t%s\n", i+1, line)
-			continue
-		}
-
-		obj, ok := cache[hash]
-		if !ok {
-			var err error
-			obj, err = whyStore.Get(hash)
-			if err != nil {
-				fmt.Fprintf(w, "%4d\t%s\t(missing)\t%s\n", i+1, hash[:8], line)
-				continue
+		// Print header when entering a new reasoning group
+		if hash != prevHash && hash != "" {
+			obj, ok := cache[hash]
+			if !ok {
+				obj, err = whyStore.Get(hash)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "%4d │ %s\n", i+1, line)
+					prevHash = hash
+					continue
+				}
+				cache[hash] = obj
 			}
-			cache[hash] = obj
+			summary := truncate(obj.Reasoning, 70)
+			fmt.Printf("── %s: %s ──\n", obj.Commit, summary)
 		}
 
-		summary := truncate(obj.Reasoning, 60)
-		fmt.Fprintf(w, "%4d\t%s\t%s\t%s\n", i+1, obj.Commit, summary, line)
+		fmt.Printf("%4d │ %s\n", i+1, line)
+		prevHash = hash
 	}
-	w.Flush()
+
 	return nil
 }
 

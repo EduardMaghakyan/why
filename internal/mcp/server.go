@@ -215,30 +215,34 @@ func (s *Server) handleWhyBlame(arguments json.RawMessage) (*ToolCallResult, err
 	hashes, _ := s.refs.Read(filePath)
 
 	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n\n", filePath)
+
 	cache := map[string]*store.Object{}
+	prevHash := ""
+
 	for i, line := range sourceLines {
 		hash := ""
 		if i < len(hashes) {
 			hash = hashes[i]
 		}
 
-		if hash == "" {
-			fmt.Fprintf(&b, "%4d\t\t\t%s\n", i+1, line)
-			continue
-		}
-
-		obj, ok := cache[hash]
-		if !ok {
-			obj, err = s.store.Get(hash)
-			if err != nil {
-				fmt.Fprintf(&b, "%4d\t%s\t(missing)\t%s\n", i+1, hash[:8], line)
-				continue
+		if hash != prevHash && hash != "" {
+			obj, ok := cache[hash]
+			if !ok {
+				obj, err = s.store.Get(hash)
+				if err != nil {
+					fmt.Fprintf(&b, "%4d │ %s\n", i+1, line)
+					prevHash = hash
+					continue
+				}
+				cache[hash] = obj
 			}
-			cache[hash] = obj
+			summary := mcpTruncate(obj.Reasoning, 70)
+			fmt.Fprintf(&b, "── %s: %s ──\n", obj.Commit, summary)
 		}
 
-		summary := mcpTruncate(obj.Reasoning, 60)
-		fmt.Fprintf(&b, "%4d\t%s\t%s\t%s\n", i+1, obj.Commit, summary, line)
+		fmt.Fprintf(&b, "%4d │ %s\n", i+1, line)
+		prevHash = hash
 	}
 
 	return &ToolCallResult{
