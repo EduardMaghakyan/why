@@ -39,7 +39,19 @@ func (r *Refs) Read(sourcePath string) ([]string, error) {
 }
 
 // Write atomically writes the hash slice to the refs file.
+// Skips writing if all hashes are empty (no reasoning to store).
 func (r *Refs) Write(sourcePath string, hashes []string) error {
+	allEmpty := true
+	for _, h := range hashes {
+		if h != "" {
+			allEmpty = false
+			break
+		}
+	}
+	if allEmpty {
+		return nil
+	}
+
 	path := r.refPath(sourcePath)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err

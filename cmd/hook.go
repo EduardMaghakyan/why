@@ -110,6 +110,11 @@ func runHookPost(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
+		// Fallback: try reading pending hash if pre-hook missed it
+		if state.ReasoningHash == "" {
+			state.ReasoningHash = hook.ReadPending()
+		}
+
 		// Read current file
 		newContent, err := os.ReadFile(filePath)
 		if err != nil {
