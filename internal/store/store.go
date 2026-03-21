@@ -14,6 +14,7 @@ import (
 type Object struct {
 	Timestamp string `json:"ts"`
 	Commit    string `json:"commit"`
+	TurnID    string `json:"turn,omitempty"`
 	Reasoning string `json:"reasoning"`
 }
 

@@ -4,8 +4,11 @@ import "encoding/json"
 
 // HookInput matches the JSON structure Claude Code sends to hooks.
 type HookInput struct {
-	ToolName  string          `json:"tool_name"`
-	ToolInput json.RawMessage `json:"tool_input"`
+	ToolName       string          `json:"tool_name"`
+	ToolInput      json.RawMessage `json:"tool_input"`
+	TranscriptPath string          `json:"transcript_path"`
+	ToolUseID      string          `json:"tool_use_id"`
+	SessionID      string          `json:"session_id"`
 }
 
 // ExtractPaths extracts file path(s) from various tool_input shapes.

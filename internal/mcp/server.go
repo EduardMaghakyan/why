@@ -177,6 +177,7 @@ func (s *Server) handleRecordWhy(arguments json.RawMessage) (*ToolCallResult, er
 	obj := &store.Object{
 		Timestamp: time.Now().Format("2006-01-02 15:04"),
 		Commit:    gitCommit(),
+		TurnID:    hook.ReadTurnID(),
 		Reasoning: args.Reasoning,
 	}
 
@@ -294,19 +295,11 @@ func (s *Server) handleWhyHistory(arguments json.RawMessage) (*ToolCallResult, e
 		fmt.Fprintf(&b, "## %s | %s\n\n%s\n", e.obj.Timestamp, e.obj.Commit, e.obj.Reasoning)
 
 		if args.Related {
-			related := s.refs.FindByHash(e.hash)
-			delete(related, filePath)
-
+			related := s.refs.FindRelated(filePath, s.store)
 			if len(related) > 0 {
-				keys := make([]string, 0, len(related))
-				for k := range related {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-
-				fmt.Fprintf(&b, "\n  Related files:\n")
-				for _, k := range keys {
-					fmt.Fprintf(&b, "    %s (%d lines)\n", k, related[k])
+				fmt.Fprintf(&b, "\n  Also changed:\n")
+				for _, r := range related {
+					fmt.Fprintf(&b, "    %s\n", r)
 				}
 			}
 		}

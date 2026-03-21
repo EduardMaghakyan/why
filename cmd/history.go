@@ -18,7 +18,7 @@ var historyCmd = &cobra.Command{
 }
 
 func init() {
-	historyCmd.Flags().BoolVar(&historyRelated, "related", false, "Show files changed together (by shared reasoning hash)")
+	historyCmd.Flags().BoolVar(&historyRelated, "related", false, "Show files changed together")
 	rootCmd.AddCommand(historyCmd)
 }
 
@@ -60,20 +60,11 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		fmt.Printf("## %s | %s\n\n%s\n", e.obj.Timestamp, e.obj.Commit, e.obj.Reasoning)
 
 		if historyRelated {
-			related := refs.FindByHash(e.hash)
-			delete(related, filePath)
-
+			related := refs.FindRelated(filePath, whyStore)
 			if len(related) > 0 {
-				// Sort keys for stable output
-				keys := make([]string, 0, len(related))
-				for k := range related {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-
-				fmt.Printf("\n  Related files:\n")
-				for _, k := range keys {
-					fmt.Printf("    %s (%d lines)\n", k, related[k])
+				fmt.Printf("\n  Also changed:\n")
+				for _, r := range related {
+					fmt.Printf("    %s\n", r)
 				}
 			}
 		}

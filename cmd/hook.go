@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"time"
+
 	"github.com/eduardmaghakyan/why/internal/hook"
 	"github.com/eduardmaghakyan/why/internal/store"
 	"github.com/spf13/cobra"
@@ -30,9 +32,23 @@ var hookPostCmd = &cobra.Command{
 	RunE:  runHookPost,
 }
 
+var hookTurnStartCmd = &cobra.Command{
+	Use:   "turn-start",
+	Short: "UserPromptSubmit hook handler",
+	RunE:  runHookTurnStart,
+}
+
+var hookTurnEndCmd = &cobra.Command{
+	Use:   "turn-end",
+	Short: "Stop hook handler",
+	RunE:  runHookTurnEnd,
+}
+
 func init() {
 	hookCmd.AddCommand(hookPreCmd)
 	hookCmd.AddCommand(hookPostCmd)
+	hookCmd.AddCommand(hookTurnStartCmd)
+	hookCmd.AddCommand(hookTurnEndCmd)
 	rootCmd.AddCommand(hookCmd)
 }
 
@@ -49,6 +65,22 @@ func runHookPre(cmd *cobra.Command, args []string) error {
 
 	paths := hook.ExtractPaths(hookInput.ToolInput)
 	sharedHash := hook.ReadPending()
+	turnID := hook.ReadTurnID()
+
+	// Fallback: recover reasoning from transcript if pending hash is missing
+	if sharedHash == "" && hookInput.TranscriptPath != "" {
+		if reasoning := hook.ExtractLastReasoning(hookInput.TranscriptPath); reasoning != "" {
+			whyStore := store.New(".why")
+			obj := &store.Object{
+				Timestamp: time.Now().Format("2006-01-02 15:04"),
+				TurnID:    turnID,
+				Reasoning: reasoning,
+			}
+			if hash, err := whyStore.Put(obj); err == nil {
+				sharedHash = hash
+			}
+		}
+	}
 
 	for _, filePath := range paths {
 		filePath = relPath(filePath)
@@ -61,14 +93,11 @@ func runHookPre(cmd *cobra.Command, args []string) error {
 		}
 		key := hook.FileKey(absPath)
 
-		if sharedHash == "" {
-			fmt.Fprintf(os.Stderr, "warning: no reasoning recorded for %s (was record_why called?)\n", filePath)
-		}
-
 		content, _ := os.ReadFile(filePath)
 		state := &hook.PreState{
 			FilePath:      filePath,
 			ReasoningHash: sharedHash,
+			TurnID:        turnID,
 			Snapshot:      string(content),
 		}
 		state.Save(key)
@@ -164,6 +193,34 @@ func shouldSkip(path string) bool {
 		return true
 	}
 	return false
+}
+
+func runHookTurnStart(cmd *cobra.Command, args []string) error {
+	input, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return err
+	}
+
+	var hookInput struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := json.Unmarshal(input, &hookInput); err != nil {
+		return nil
+	}
+
+	turnID := fmt.Sprintf("%s:%d", hookInput.SessionID, time.Now().UnixMilli())
+	hook.WriteTurnID(turnID)
+
+	fmt.Println("{}")
+	return nil
+}
+
+func runHookTurnEnd(cmd *cobra.Command, args []string) error {
+	// Drain stdin (hook always sends input)
+	io.ReadAll(os.Stdin)
+	hook.ClearTurnID()
+	fmt.Println("{}")
+	return nil
 }
 
 func splitLines(s string) []string {

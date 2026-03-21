@@ -3,7 +3,9 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/eduardmaghakyan/why/internal/diff"
 )
@@ -89,42 +91,103 @@ func (r *Refs) Rebuild(oldLines, newLines, oldHashes []string, reasoningHash str
 	return newHashes
 }
 
-// FindByHash walks all refs files and returns a map of filePath→lineCount
-// for every file that contains at least one line matching the given hash.
-func (r *Refs) FindByHash(hash string) map[string]int {
+// FindRelated returns file paths that were edited together with the given file.
+// Primary: matches by turn ID. Fallback: timestamp clustering (5 min window).
+func (r *Refs) FindRelated(filePath string, s *Store) []string {
+	// Collect turn IDs and timestamps from the target file
+	targetHashes := r.uniqueHashes(filePath)
+	if len(targetHashes) == 0 {
+		return nil
+	}
+
+	var targetTurnIDs []string
+	var targetTimes []time.Time
+	for _, hash := range targetHashes {
+		obj, err := s.Get(hash)
+		if err != nil {
+			continue
+		}
+		if obj.TurnID != "" {
+			targetTurnIDs = append(targetTurnIDs, obj.TurnID)
+		}
+		if t, err := time.Parse("2006-01-02 15:04", obj.Timestamp); err == nil {
+			targetTimes = append(targetTimes, t)
+		}
+	}
+
+	turnIDSet := make(map[string]bool)
+	for _, id := range targetTurnIDs {
+		turnIDSet[id] = true
+	}
+
+	// Walk all refs files and find matches
 	refsDir := filepath.Join(r.Root, "refs")
-	result := make(map[string]int)
+	related := make(map[string]bool)
 
 	filepath.Walk(refsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
-		data, err := os.ReadFile(path)
-		if err != nil {
+		rel, err := filepath.Rel(refsDir, path)
+		if err != nil || rel == filePath {
 			return nil
 		}
-		content := string(data)
-		if !strings.Contains(content, hash) {
-			return nil
-		}
-		lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
-		count := 0
-		for _, line := range lines {
-			if line == hash {
-				count++
-			}
-		}
-		if count > 0 {
-			rel, err := filepath.Rel(refsDir, path)
+
+		hashes := r.uniqueHashes(rel)
+		for _, hash := range hashes {
+			obj, err := s.Get(hash)
 			if err != nil {
+				continue
+			}
+
+			// Primary: match by turn ID
+			if obj.TurnID != "" && turnIDSet[obj.TurnID] {
+				related[rel] = true
 				return nil
 			}
-			result[rel] = count
+
+			// Fallback: timestamp proximity (5 min window)
+			if len(targetTurnIDs) == 0 {
+				if t, err := time.Parse("2006-01-02 15:04", obj.Timestamp); err == nil {
+					for _, tt := range targetTimes {
+						if absDuration(t.Sub(tt)) <= 5*time.Minute {
+							related[rel] = true
+							return nil
+						}
+					}
+				}
+			}
 		}
 		return nil
 	})
 
+	result := make([]string, 0, len(related))
+	for f := range related {
+		result = append(result, f)
+	}
+	sort.Strings(result)
 	return result
+}
+
+// uniqueHashes returns deduplicated non-empty hashes from a refs file.
+func (r *Refs) uniqueHashes(filePath string) []string {
+	hashes, _ := r.Read(filePath)
+	seen := make(map[string]bool)
+	var unique []string
+	for _, h := range hashes {
+		if h != "" && !seen[h] {
+			seen[h] = true
+			unique = append(unique, h)
+		}
+	}
+	return unique
+}
+
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
 
 func (r *Refs) refPath(sourcePath string) string {

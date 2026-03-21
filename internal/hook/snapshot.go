@@ -11,12 +11,14 @@ import (
 var (
 	pendingDir   = filepath.Join(os.TempDir(), ".why-pending")
 	hookStateDir = filepath.Join(os.TempDir(), ".why-hook-state")
+	turnDir      = filepath.Join(os.TempDir(), ".why-turn")
 )
 
 // PreState holds the state saved between pre and post hooks.
 type PreState struct {
 	FilePath      string `json:"file_path"`
 	ReasoningHash string `json:"reasoning_hash"`
+	TurnID        string `json:"turn_id,omitempty"`
 	Snapshot      string `json:"snapshot"`
 }
 
@@ -58,6 +60,28 @@ func (s *PreState) Save(key string) error {
 // TempDirs returns the pending and hook-state temp directory paths.
 func TempDirs() (string, string) {
 	return pendingDir, hookStateDir
+}
+
+// WriteTurnID writes the current turn ID.
+func WriteTurnID(turnID string) error {
+	if err := os.MkdirAll(turnDir, 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(turnDir, "current"), []byte(turnID), 0644)
+}
+
+// ReadTurnID reads the current turn ID (non-destructive).
+func ReadTurnID() string {
+	data, err := os.ReadFile(filepath.Join(turnDir, "current"))
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// ClearTurnID removes the current turn ID.
+func ClearTurnID() {
+	os.Remove(filepath.Join(turnDir, "current"))
 }
 
 // LoadState loads and deletes pre-hook state.
