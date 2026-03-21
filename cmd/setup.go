@@ -95,9 +95,10 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("\nDone. why-tracking installed.")
 	fmt.Println("\nUseful commands:")
-	fmt.Println("  why blame <file>      # line-by-line reasoning")
-	fmt.Println("  why history <file>    # edit history for a file")
-	fmt.Println("  why uninstall         # remove why-tracking")
+	fmt.Println("  why blame <file>           # line-by-line reasoning")
+	fmt.Println("  why history <file>         # edit history for a file")
+	fmt.Println("  why query \"question\"       # ask about reasoning via Claude")
+	fmt.Println("  why uninstall              # remove why-tracking")
 	return nil
 }
 
@@ -374,35 +375,40 @@ func writeInstructionsGlobal() error {
 	if err != nil {
 		return fmt.Errorf("get home directory: %w", err)
 	}
-	destPath := filepath.Join(homeDir, ".claude", "CLAUDE.md")
+	claudeDir := filepath.Join(homeDir, ".claude")
+	os.MkdirAll(claudeDir, 0755)
 
+	// 1. Write ~/.claude/why-tracking.md (always overwrite to pick up template updates)
+	whyTrackingPath := filepath.Join(claudeDir, "why-tracking.md")
 	content, err := config.Templates.ReadFile("templates/why-tracking.md")
 	if err != nil {
 		return fmt.Errorf("read why-tracking template: %w", err)
 	}
+	if err := os.WriteFile(whyTrackingPath, content, 0644); err != nil {
+		return fmt.Errorf("write ~/.claude/why-tracking.md: %w", err)
+	}
+	fmt.Println("  Created ~/.claude/why-tracking.md")
 
-	if data, err := os.ReadFile(destPath); err == nil {
-		if strings.Contains(string(data), "Before every edit, call `record_why`") {
-			fmt.Println("  ~/.claude/CLAUDE.md already has why-tracking instructions")
-			return nil
+	// 2. Add include line to ~/.claude/CLAUDE.md
+	claudeMD := filepath.Join(claudeDir, "CLAUDE.md")
+	include := "@.claude/why-tracking.md"
+	if data, err := os.ReadFile(claudeMD); err != nil {
+		// File does not exist — create with just the include
+		if err := os.WriteFile(claudeMD, []byte(include+"\n"), 0644); err != nil {
+			return fmt.Errorf("write ~/.claude/CLAUDE.md: %w", err)
 		}
-		// Append to existing file
-		f, err := os.OpenFile(destPath, os.O_APPEND|os.O_WRONLY, 0644)
+		fmt.Println("  Created ~/.claude/CLAUDE.md")
+	} else if !strings.Contains(string(data), include) {
+		f, err := os.OpenFile(claudeMD, os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			return fmt.Errorf("open ~/.claude/CLAUDE.md: %w", err)
 		}
-		f.WriteString("\n" + string(content))
+		f.WriteString("\n" + include + "\n")
 		f.Close()
-		fmt.Println("  Appended why-tracking instructions to ~/.claude/CLAUDE.md")
-		return nil
+		fmt.Println("  Appended include to ~/.claude/CLAUDE.md")
+	} else {
+		fmt.Println("  ~/.claude/CLAUDE.md already configured")
 	}
-
-	// File does not exist — create it
-	os.MkdirAll(filepath.Dir(destPath), 0755)
-	if err := os.WriteFile(destPath, content, 0644); err != nil {
-		return fmt.Errorf("write ~/.claude/CLAUDE.md: %w", err)
-	}
-	fmt.Println("  Created ~/.claude/CLAUDE.md with why-tracking instructions")
 	return nil
 }
 

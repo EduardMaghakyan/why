@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "mcp__why-tracker__record_why"
+      "mcp__why-tracker__record_why",
+      "mcp__why-tracker__why_blame",
+      "mcp__why-tracker__why_history"
     ]
   },
   "hooks": {

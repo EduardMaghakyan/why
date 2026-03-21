@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // Object is a single immutable reasoning entry.
@@ -68,6 +69,41 @@ func (s *Store) Get(hash string) (*Object, error) {
 		return nil, fmt.Errorf("unmarshal object %s: %w", truncHash(hash), err)
 	}
 	return &obj, nil
+}
+
+// ObjectEntry pairs a hash with its deserialized Object.
+type ObjectEntry struct {
+	Hash   string
+	Object *Object
+}
+
+// ListAll walks .why/objects/ and returns all reasoning entries sorted by timestamp.
+func (s *Store) ListAll() ([]ObjectEntry, error) {
+	objDir := filepath.Join(s.Root, "objects")
+	var entries []ObjectEntry
+
+	filepath.Walk(objDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		dir := filepath.Base(filepath.Dir(path))
+		if len(dir) != 2 {
+			return nil
+		}
+		hash := dir + info.Name()
+		obj, err := s.Get(hash)
+		if err != nil {
+			return nil
+		}
+		entries = append(entries, ObjectEntry{Hash: hash, Object: obj})
+		return nil
+	})
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Object.Timestamp < entries[j].Object.Timestamp
+	})
+
+	return entries, nil
 }
 
 func (s *Store) objectPath(hash string) string {

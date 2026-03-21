@@ -152,7 +152,7 @@ func removeSettingsGlobal() {
 		if allow, ok := perms["allow"].([]interface{}); ok {
 			var filtered []interface{}
 			for _, item := range allow {
-				if s, ok := item.(string); ok && s == "mcp__why-tracker__record_why" {
+				if s, ok := item.(string); ok && strings.HasPrefix(s, "mcp__why-tracker__") {
 					continue
 				}
 				filtered = append(filtered, item)
