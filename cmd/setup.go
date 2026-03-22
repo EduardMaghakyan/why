@@ -101,6 +101,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	os.MkdirAll(filepath.Join(projectDir, ".why", "objects"), 0755)
 	os.MkdirAll(filepath.Join(projectDir, ".why", "refs"), 0755)
+	os.MkdirAll(filepath.Join(projectDir, ".why", "symbols"), 0755)
 
 	fmt.Println("\nDone. why-tracking installed.")
 	fmt.Println("\nUseful commands:")

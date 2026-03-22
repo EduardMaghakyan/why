@@ -12,6 +12,7 @@ import (
 
 	"github.com/eduardmaghakyan/why/internal/hook"
 	"github.com/eduardmaghakyan/why/internal/store"
+	"github.com/eduardmaghakyan/why/internal/symbols"
 	"github.com/spf13/cobra"
 )
 
@@ -161,6 +162,30 @@ func runHookPost(cmd *cobra.Command, args []string) error {
 
 		// Write refs
 		refs.Write(filePath, newHashes)
+
+		// Update symbol-level reasoning
+		if state.ReasoningHash != "" {
+			syms := symbols.Extract(filePath, newContent)
+			if len(syms) > 0 {
+				symbolRefs := store.NewSymbolRefs(".why")
+				// Find which lines changed (have the new reasoning hash)
+				seen := map[string]bool{}
+				for i, h := range newHashes {
+					if h != state.ReasoningHash {
+						continue
+					}
+					sym := symbols.FindAt(syms, i+1)
+					symName := "_module"
+					if sym != nil {
+						symName = sym.Name
+					}
+					if !seen[symName] {
+						symbolRefs.Append(filePath, symName, state.ReasoningHash, time.Now().Format("2006-01-02 15:04"))
+						seen[symName] = true
+					}
+				}
+			}
+		}
 	}
 
 	fmt.Println("{}")
