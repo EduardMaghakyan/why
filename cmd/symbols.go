@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/eduardmaghakyan/why/internal/store"
 	"github.com/spf13/cobra"
@@ -30,26 +32,49 @@ func runSymbols(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	names := symbolRefs.ListSymbols(filePath)
+	// Collect unique hashes and map hash → symbols
+	type entry struct {
+		hash    string
+		ts      string
+		symbols []string
+	}
+	hashToSymbols := map[string]*entry{}
+	var ordered []string
+
+	for symName, entries := range refs {
+		for _, e := range entries {
+			if existing, ok := hashToSymbols[e.Hash]; ok {
+				existing.symbols = append(existing.symbols, symName)
+			} else {
+				hashToSymbols[e.Hash] = &entry{
+					hash:    e.Hash,
+					ts:      e.Timestamp,
+					symbols: []string{symName},
+				}
+				ordered = append(ordered, e.Hash)
+			}
+		}
+	}
+
+	// Sort by timestamp
+	sort.Slice(ordered, func(i, j int) bool {
+		return hashToSymbols[ordered[i]].ts < hashToSymbols[ordered[j]].ts
+	})
+
 	fmt.Println(filePath)
 	fmt.Println()
 
-	for _, name := range names {
-		entries := refs[name]
-		fmt.Printf("%s (%d edit", name, len(entries))
-		if len(entries) != 1 {
-			fmt.Print("s")
-		}
-		fmt.Println(")")
+	for _, hash := range ordered {
+		e := hashToSymbols[hash]
+		sort.Strings(e.symbols)
 
-		for _, e := range entries {
-			obj, err := whyStore.Get(e.Hash)
-			if err != nil {
-				fmt.Printf("── %s | (missing) ──\n\n", e.Timestamp)
-				continue
-			}
-			fmt.Printf("── %s | %s ──\n%s\n\n", e.Timestamp, obj.Commit, obj.Reasoning)
+		obj, err := whyStore.Get(hash)
+		if err != nil {
+			fmt.Printf("── %s | (missing) ──\n\n", e.ts)
+			continue
 		}
+
+		fmt.Printf("── %s | %s ──\n%s\n\n  Symbols: %s\n\n", e.ts, obj.Commit, obj.Reasoning, strings.Join(e.symbols, ", "))
 	}
 
 	return nil
