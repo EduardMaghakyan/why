@@ -39,11 +39,15 @@ When the user asks **why** code was changed, what the reasoning was behind a
 change, or asks you to explain past edits — you MUST run these commands
 **before** or **instead of** relying solely on `git log`:
 
+- `why symbols <file>` — show reasoning grouped by function, class, or method.
+  **Use this first** when asked "why does X work this way?" or about a specific
+  function/class. Shows the full reasoning trail per symbol, powered by
+  tree-sitter (supports Go, Python, TypeScript, JavaScript, Rust, Java, Ruby, C, C++).
 - `why history <file>` — show the full edit history with reasoning for a file.
   Add `--related` to see files changed together.
-  Use this when asked about the history of changes to a file.
+  Use this when asked about the chronological history of changes.
 - `why blame <file>` — show line-by-line reasoning for any file.
-  Use this when asked about specific lines or sections.
+  Use this when asked about specific lines or sections of code.
 
 These tools provide the actual reasoning behind each edit (the "why"),
 which git commit messages often lack. You may still use `git log` for
