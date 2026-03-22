@@ -48,6 +48,26 @@ timeout to auto-reset.
 
 Every edit, with full reasoning and related files — a decision journal that writes itself.
 
+## See reasoning by symbol
+
+```bash
+$ why symbols src/auth/login.ts
+
+src/auth/login.ts
+
+── 2026-03-19 14:32 | a3f9c2b ──
+Token refresh racing with logout — refresh() and logout() both read token
+state simultaneously, causing a double-refresh crash on slow connections.
+Added an isRefreshing ref flag to prevent re-entrant calls, with a 5s
+timeout to auto-reset.
+
+  Symbols: AuthService.refreshToken, AuthService.logout
+```
+
+Ask "why does `refreshToken` work this way?" and get the full reasoning trail —
+powered by tree-sitter parsing across Go, Python, TypeScript, JavaScript, Rust,
+Java, Ruby, C, and C++.
+
 ## Getting Started
 
 ```bash
@@ -75,7 +95,9 @@ why record <file> '<reasoning>'   # Record reasoning before an edit
 why blame <file>                  # Line-by-line reasoning
 why history <file>                # Full edit history with reasoning
 why history --related <file>      # + files changed together
+why symbols <file>                # Reasoning grouped by function/class
 why query "<question>"            # Ask anything about past decisions
+why reindex                       # Rebuild symbol index from existing refs
 why setup                         # Install globally
 why setup --project               # Install per-project
 why setup --mcp                   # Install with MCP server (optional)
@@ -95,6 +117,7 @@ Claude runs: Edit(src/main.go, ...)
   → pre-hook: snapshots file, reads reasoning hash
   → [edit happens]
   → post-hook: diffs old vs new, updates .why/refs/src/main.go
+  → tree-sitter extracts symbols, maps reasoning to functions/classes
 ```
 
 Turn-based grouping tracks which edits belong together: a `UserPromptSubmit` hook
@@ -106,8 +129,9 @@ reads the reasoning from the conversation history automatically.
 
 ```
 .why/
-  objects/<hash>    # immutable reasoning entries (content-addressed)
-  refs/<file>       # one hash per source line, like git blame
+  objects/<hash>        # immutable reasoning entries (content-addressed)
+  refs/<file>           # one hash per source line, like git blame
+  symbols/<file>.json   # reasoning grouped by function/class (tree-sitter)
 ```
 
 ### MCP mode (optional)
