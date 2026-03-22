@@ -45,13 +45,11 @@ func runSymbols(cmd *cobra.Command, args []string) error {
 		for _, e := range entries {
 			obj, err := whyStore.Get(e.Hash)
 			if err != nil {
-				fmt.Printf("  %s | (missing)\n", e.Timestamp)
+				fmt.Printf("── %s | (missing) ──\n\n", e.Timestamp)
 				continue
 			}
-			summary := truncate(obj.Reasoning, 70)
-			fmt.Printf("  %s | %s\n", e.Timestamp, summary)
+			fmt.Printf("── %s | %s ──\n%s\n\n", e.Timestamp, obj.Commit, obj.Reasoning)
 		}
-		fmt.Println()
 	}
 
 	return nil
