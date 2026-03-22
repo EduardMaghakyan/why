@@ -56,6 +56,17 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		return entries[i].obj.Timestamp < entries[j].obj.Timestamp
 	})
 
+	// Deduplicate by reasoning text (keep earliest)
+	seenReasoning := map[string]bool{}
+	var deduped []entry
+	for _, e := range entries {
+		if !seenReasoning[e.obj.Reasoning] {
+			seenReasoning[e.obj.Reasoning] = true
+			deduped = append(deduped, e)
+		}
+	}
+	entries = deduped
+
 	for _, e := range entries {
 		fmt.Printf("## %s | %s\n\n%s\n", e.obj.Timestamp, e.obj.Commit, e.obj.Reasoning)
 
