@@ -54,15 +54,38 @@ func TestExtractLastReasoningMultiple(t *testing.T) {
 	}
 }
 
-func TestExtractLastReasoningEmpty(t *testing.T) {
+func TestExtractLastReasoningFallbackToText(t *testing.T) {
 	path := writeTranscript(t,
 		`{"type":"user","message":{"content":"hello"}}`,
-		`{"type":"assistant","message":{"content":[{"type":"text","text":"Hi there!"}]}}`,
+		`{"type":"assistant","message":{"content":[{"type":"text","text":"Fix the MMKV interface to use createMMKV() instead of new MMKV()"}]}}`,
+	)
+
+	got := ExtractLastReasoning(path)
+	if got != "Fix the MMKV interface to use createMMKV() instead of new MMKV()" {
+		t.Errorf("want assistant text fallback, got %q", got)
+	}
+}
+
+func TestExtractLastReasoningPrefersRecordWhy(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"assistant","message":{"content":[{"type":"text","text":"Some terse text"}]}}`,
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__why-tracker__record_why","input":{"file_path":"a.go","reasoning":"Structured reasoning"}}]}}`,
+	)
+
+	got := ExtractLastReasoning(path)
+	if got != "Structured reasoning" {
+		t.Errorf("want structured reasoning over text, got %q", got)
+	}
+}
+
+func TestExtractLastReasoningNoContent(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"user","message":{"content":"hello"}}`,
 	)
 
 	got := ExtractLastReasoning(path)
 	if got != "" {
-		t.Errorf("want empty, got %q", got)
+		t.Errorf("want empty when no assistant messages, got %q", got)
 	}
 }
 

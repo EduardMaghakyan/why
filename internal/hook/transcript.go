@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// ExtractLastReasoning reads the transcript JSONL and returns the reasoning
-// from the most recent record_why call (MCP or Bash). Returns empty string if not found.
+// ExtractLastReasoning reads the transcript JSONL and returns reasoning.
+// Priority: (1) why record Bash command, (2) MCP record_why, (3) last assistant text.
 func ExtractLastReasoning(transcriptPath string) string {
 	if transcriptPath == "" {
 		return ""
@@ -21,6 +21,7 @@ func ExtractLastReasoning(transcriptPath string) string {
 	defer f.Close()
 
 	var lastReasoning string
+	var lastAssistantText string
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1MB buffer for long lines
 
@@ -41,12 +42,22 @@ func ExtractLastReasoning(transcriptPath string) string {
 			var block struct {
 				Type  string `json:"type"`
 				Name  string `json:"name"`
+				Text  string `json:"text"`
 				Input struct {
 					Reasoning string `json:"reasoning"`
 					Command   string `json:"command"`
 				} `json:"input"`
 			}
-			if json.Unmarshal(raw, &block) != nil || block.Type != "tool_use" {
+			if json.Unmarshal(raw, &block) != nil {
+				continue
+			}
+
+			// Track assistant text as fallback
+			if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+				lastAssistantText = strings.TrimSpace(block.Text)
+			}
+
+			if block.Type != "tool_use" {
 				continue
 			}
 
@@ -64,7 +75,18 @@ func ExtractLastReasoning(transcriptPath string) string {
 		}
 	}
 
-	return lastReasoning
+	// Prefer explicit reasoning, fall back to assistant text
+	if lastReasoning != "" {
+		return lastReasoning
+	}
+	if lastAssistantText != "" {
+		// Truncate long text to last 500 chars
+		if len(lastAssistantText) > 500 {
+			lastAssistantText = lastAssistantText[len(lastAssistantText)-500:]
+		}
+		return lastAssistantText
+	}
+	return ""
 }
 
 // parseWhyRecordCmd extracts the reasoning argument from a "why record <file> '<reasoning>'" command.
