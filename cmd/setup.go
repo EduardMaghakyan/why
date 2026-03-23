@@ -396,6 +396,7 @@ func writeInstructionsGlobal() error {
 	if err != nil {
 		return fmt.Errorf("read why-tracking template: %w", err)
 	}
+	content = resolveWhyPaths(content)
 	if err := os.WriteFile(whyTrackingPath, content, 0644); err != nil {
 		return fmt.Errorf("write ~/.claude/why-tracking.md: %w", err)
 	}
@@ -441,7 +442,27 @@ func whyBinaryPath() string {
 // resolveHookPaths replaces "why hook" with the absolute binary path in hook commands.
 func resolveHookPaths(data []byte) []byte {
 	binPath := whyBinaryPath()
-	return []byte(strings.ReplaceAll(string(data), "\"why hook", "\""+binPath+" hook"))
+	s := string(data)
+	s = strings.ReplaceAll(s, "\"why hook", "\""+binPath+" hook")
+	s = strings.ReplaceAll(s, "Bash(why ", "Bash("+binPath+" ")
+	return []byte(s)
+}
+
+// resolveWhyPaths replaces `why <cmd>` with absolute path in markdown instructions.
+func resolveWhyPaths(data []byte) []byte {
+	binPath := whyBinaryPath()
+	if binPath == "why" {
+		return data // no resolution needed, already bare name
+	}
+	s := string(data)
+	// Replace backtick-quoted commands: `why record`, `why symbols`, etc.
+	for _, cmd := range []string{"record", "symbols", "history", "blame", "query", "reindex"} {
+		s = strings.ReplaceAll(s, "`why "+cmd, "`"+binPath+" "+cmd)
+	}
+	// Replace code block commands (lines starting with why)
+	s = strings.ReplaceAll(s, "\nwhy record ", "\n"+binPath+" record ")
+	s = strings.ReplaceAll(s, "\nwhy symbols ", "\n"+binPath+" symbols ")
+	return []byte(s)
 }
 
 func addLineToFile(path, line, msg string) {
